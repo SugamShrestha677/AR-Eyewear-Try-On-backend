@@ -1,6 +1,8 @@
 const mongoose = require('mongoose');
 const config = require('./config');
 const db={}
+
+//dastbase connection
 db.connect=async()=>{
     try {
         await mongoose.connect(config.MONGODB_URI)

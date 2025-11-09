@@ -31,6 +31,11 @@ const frameSchema = new mongoose.Schema({
     default: "",
     required:true
   },
+  picture: {
+    type: String,
+    default: "",
+    required:true
+  },
   description: {
     type: String,
     default: ""

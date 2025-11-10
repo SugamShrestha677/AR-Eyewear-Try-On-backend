@@ -147,7 +147,16 @@ const verifyResetCode = async (req, res) => {
             return res.status(404).json({ error: "User not found!" });
         }
 
-        if (user.resetCode !== resetCode) {
+        // Normalize types: stored code is a string. Accept numeric or string input from client.
+        const provided = resetCode === undefined || resetCode === null ? "" : String(resetCode).trim();
+        const stored = user.resetCode === undefined || user.resetCode === null ? "" : String(user.resetCode).trim();
+
+        // Check expiry
+        if (user.resetCodeExpires && Date.now() > new Date(user.resetCodeExpires).getTime()) {
+            return res.status(400).json({ error: "Reset code expired. Please request a new one." });
+        }
+
+        if (!stored || stored !== provided) {
             return res.status(400).json({ error: "Invalid reset code!" });
         }
 
@@ -171,14 +180,16 @@ const requestResetCode = async (req, res) => {
             return res.status(404).json({ error: "User not found!" });
         }
 
-        // Generate reset code and send email (implementation not shown)
-        user.resetCode = generateResetCode();
-        await user.save();
+    // Generate reset code, set expiry, save and send email
+    user.resetCode = generateResetCode();
+    // expires in 10 minutes
+    user.resetCodeExpires = new Date(Date.now() + 10 * 60 * 1000);
+    await user.save();
 
-        // Send email with reset code (implementation not shown)
-        sendResetCodeEmail(user.email, user.resetCode);
+    // Send email with reset code (implementation not shown)
+    sendResetCodeEmail(user.email, user.resetCode);
 
-        res.status(200).json({ message: "Reset code sent to email!" });
+    res.status(200).json({ message: "Reset code sent to email!" });
     } catch (error) {
         console.log("Error requesting reset code!", error);
         res.status(500).json({ error: "Server error. Please try again later!" });
@@ -187,8 +198,10 @@ const requestResetCode = async (req, res) => {
 
 const generateResetCode = () => {
    //4 digit code
-    return Math.floor(1000 + Math.random() * 9000).toString();
+    return Math.floor(1000 + Math.random() * 9000);
 }
+
+
 const sendResetCodeEmail = (email, resetCode) => {
     // Placeholder function for sending email
     console.log(`Sending reset code ${resetCode} to email: ${email}`);

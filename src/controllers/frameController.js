@@ -3,8 +3,8 @@ const Frame = require("../models/frameModel");
 // Add Frame
 const addFrame = async(req, res) => {
     try {
-        const {name, brand, type, shape, price, quantity, image, colors} = req.body;
-        if (!name || !brand || !type || !shape || !price || !quantity || !image || !colors){
+        const {name, brand, type, shape, price, quantity, image, colors, overlayImage} = req.body;
+        if (!name || !brand || !type || !shape || !price || !quantity || !image || !colors || !overlayImage){
             return res.status(400).json({error:"All fields are required!"})
         }
         const existingFrame = await Frame.findOne({name})
@@ -20,6 +20,7 @@ const addFrame = async(req, res) => {
             quantity,
             image,
             colors,
+            overlayImage
         });
 
         await frame.save();

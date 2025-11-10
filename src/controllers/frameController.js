@@ -25,7 +25,11 @@ const addFrame = async(req, res) => {
         await frame.save();
         res.status(201).json({message:"Frame added successfully.", frame});
     } catch (error) {
-        console.log("Error adding Frame",error)
+        console.log("Error adding Frame:", {
+            message: error.message,
+            name: error.name,
+            stack: error.stack
+        });
         res.status(500).json({error:"Server error. Please try again later!"})
     }
 }

@@ -30,7 +30,6 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-
   status: {
     type: String,
   },
@@ -38,6 +37,12 @@ const userSchema = new mongoose.Schema({
     type: String,
     default:
       "https://res.cloudinary.com/yourapp/image/upload/v1/default-profile.png",
+  },
+  resetCode: {
+    type: String,
+  },
+  resetCodeExpires: {
+    type: Date,
   },
   // paymentInformation:[{
   //     type:mongoose.Schema.Types.ObjectId,

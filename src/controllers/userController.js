@@ -147,7 +147,11 @@ const verifyResetCode = async (req, res) => {
             return res.status(404).json({ error: "User not found!" });
         }
 
-        if (user.resetCode !== resetCode) {
+        // Normalize types: accept numeric or string input from client
+        const provided = resetCode === undefined || resetCode === null ? "" : String(resetCode).trim();
+        const stored = user.resetCode === undefined || user.resetCode === null ? "" : String(user.resetCode).trim();
+
+        if (!stored || stored !== provided) {
             return res.status(400).json({ error: "Invalid reset code!" });
         }
 

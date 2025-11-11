@@ -5,5 +5,6 @@ router.post('/addFrame',frame.addFrame);
 router.delete('/:frameId',frame.deleteFrame);
 router.get('/allFrames',frame.getAllFrames);
 router.put('/:frameId', frame.UpdateFrame)
+router.get('/:frameId', frame.getFrameById)
 
 module.exports = router;

@@ -61,7 +61,7 @@ const getAllFrames = async (req,res) => {
 // Update Frame
 const UpdateFrame = async (req,res) => {
     try {
-        const {name, brand, type, shape, price, quantity, image, colors} = req.body;
+        const {name, brand, type, shape, price, quantity, image, colors, overlayImage} = req.body;
         const {frameId} = req.params;
         const frame = await Frame.findByIdAndUpdate(frameId)
         if (!frame) {
@@ -77,6 +77,7 @@ const UpdateFrame = async (req,res) => {
             quantity,
             image,
             colors,
+            overlayImage,
         });
 
         await Updatedframe.save();

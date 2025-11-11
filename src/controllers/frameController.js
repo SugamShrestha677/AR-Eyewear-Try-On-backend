@@ -65,7 +65,7 @@ const getAllFrames = async (req,res) => {
 // Update Frame
 const UpdateFrame = async (req,res) => {
     try {
-        const {name, brand, type, shape, price, quantity, image, colors} = req.body;
+        const {name, brand, type, shape, price, quantity, image, colors, overlayImage} = req.body;
         const {frameId} = req.params;
         const frame = await Frame.findByIdAndUpdate(frameId)
         if (!frame) {
@@ -81,6 +81,7 @@ const UpdateFrame = async (req,res) => {
             quantity,
             image,
             colors,
+            overlayImage
         });
 
         await Updatedframe.save();
@@ -93,4 +94,19 @@ const UpdateFrame = async (req,res) => {
     
 }
 
-module.exports={addFrame, getAllFrames, deleteFrame, UpdateFrame}
+// Get Frame by ID
+const getFrameById = async (req, res) => {
+    try {
+        const { frameId } = req.params;
+        const frame = await Frame.findById(frameId);
+        if (!frame) {
+            return res.status(404).json({ error: "Frame not found!" });
+        }
+        res.status(200).json({ frame });
+    } catch (error) {
+        console.log("Error fetching frame by ID", error);
+        res.status(500).json({ error: "Server error! Please try again later!" });
+    }
+};
+        
+module.exports={addFrame, getAllFrames, deleteFrame, UpdateFrame, getFrameById}

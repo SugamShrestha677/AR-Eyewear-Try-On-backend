@@ -9,5 +9,13 @@ router.get('/allUsers',userController.getAllUsers)
 router.delete('/:userId',userController.deleteUser)
 router.get('/:userId',userController.getUserById);
 router.post('/resetPassword',userController.resetPassword);
+router.post('/requestResetCode',userController.requestResetCode);
+router.post('/verifyResetCode',userController.verifyResetCode);
 
+
+// router.delete('/:userId',userController.deleteUser)
+// router.get('/:userId',userController.getUserById);
+// router.post('/changePassword',userController.changePassword);
+// router.post('/requestResetCode',userController.requestResetCode);
+// router.post('/verifyResetCode',userController.verifyResetCode);
 module.exports=router;

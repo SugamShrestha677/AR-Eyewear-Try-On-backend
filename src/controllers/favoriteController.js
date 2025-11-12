@@ -46,16 +46,15 @@ const addFavorite = async (req, res) => {
 // Remove Frame from Favorites
 const removeFavorite = async (req, res) => {
     try {
-        const userId = req.userId; // from auth middleware
-        const frameId = req.params.frameId || req.body.frameId;
+        const favoriteId = req.params.favoriteId || req.body.favoriteId;
 
         // Validate input
-        if (!frameId) {
-            return res.status(400).json({ error: 'frameId is required' });
+        if (!favoriteId) {
+            return res.status(400).json({ error: 'favoriteId is required' });
         }
 
         // Delete favorite
-        const deleted = await Favorite.findOneAndDelete({ userId, frameId });
+        const deleted = await Favorite.findOneAndDelete({ _id: favoriteId });
 
         if (!deleted) {
             return res.status(200).json({ message: 'Frame was not in favorites' });
@@ -148,32 +147,9 @@ const listFavoritesByUserId = async (req, res) => {
     }
 };
 
-// Check if a frame is favorited by current user
-const isFavorited = async (req, res) => {
-    try {
-        const userId = req.userId; // from auth middleware
-        const { frameId } = req.params;
-
-        if (!frameId) {
-            return res.status(400).json({ error: 'frameId is required' });
-        }
-
-        const favorite = await Favorite.findOne({ userId, frameId });
-
-        return res.status(200).json({
-            isFavorited: !!favorite,
-            favoriteId: favorite ? favorite._id : null
-        });
-    } catch (error) {
-        console.log('Error checking favorite status:', error);
-        res.status(500).json({ error: 'Server error. Please try again later!' });
-    }
-};
-
 module.exports = {
     addFavorite,
     removeFavorite,
     listFavoritesForMe,
     listFavoritesByUserId,
-    isFavorited
 };

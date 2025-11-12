@@ -31,7 +31,7 @@ const frameSchema = new mongoose.Schema({
     default: "",
     required:true
   },
-  picture: {
+  overlayImage: {
     type: String,
     default: "",
     required:true

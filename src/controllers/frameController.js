@@ -20,7 +20,7 @@ const addFrame = async(req, res) => {
             quantity,
             image,
             colors,
-            overlayImage
+            overlayImage,
         });
 
         await frame.save();
@@ -81,7 +81,7 @@ const UpdateFrame = async (req,res) => {
             quantity,
             image,
             colors,
-            overlayImage
+            overlayImage,
         });
 
         await Updatedframe.save();

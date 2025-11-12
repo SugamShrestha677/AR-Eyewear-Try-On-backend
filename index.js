@@ -5,10 +5,12 @@ const app = express()
 
 const userRoutes = require('./src/routes/userRoutes');
 const frameRoutes = require('./src/routes/frameRoutes');
+const favoriteRoutes = require('./src/routes/favoriteRoutes');
 app.use(express.json());
 
 app.use("/api/users",userRoutes);
 app.use("/api/frames",frameRoutes);
+app.use("/api/favorites", favoriteRoutes);
 
 app.get("/",(req,res)=>{
     res.send("This is the trial project of Netrafit.");

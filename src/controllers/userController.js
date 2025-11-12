@@ -47,7 +47,6 @@ const login = async (req,res) => {
         const isMatch = await bcrypt.compare(password,user.password)
         if (!isMatch) {
             return res.status(400).json({error:"Invalid Credentials!"});
-
         }
 
         const token = jwt.sign({userId:user._id}, config.JWT_SECRET,{
@@ -107,7 +106,7 @@ const getUserById = async (req, res) => {
 }
 
 // password reset 
-const resetPassword = async (req, res) => {
+const changePassword = async (req, res) => {
     try {
         const { email, oldPassword, newPassword } = req.body;
         if (!email || !oldPassword || !newPassword) {
@@ -127,17 +126,86 @@ const resetPassword = async (req, res) => {
         user.password = await bcrypt.hash(newPassword, 10);
         await user.save();
 
-        res.status(200).json({ message: "Password reset successful!" });
+        res.status(200).json({ message: "Password changed successfully!" });
     } catch (error) {
-        console.log("Error resetting password!", error);
+        console.log("Error changing password!", error);
         res.status(500).json({ error: "Server error. Please try again later!" });
     }
 }
 
+//verify reset code
+const verifyResetCode = async (req, res) => {
+    try {
+        const { email, resetCode } = req.body;
+        if (!email || !resetCode) {
+            return res.status(400).json({ error: "All fields are required!" });
+        }
+
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(404).json({ error: "User not found!" });
+        }
+
+        // Normalize types: stored code is a string. Accept numeric or string input from client.
+        const provided = resetCode === undefined || resetCode === null ? "" : String(resetCode).trim();
+        const stored = user.resetCode === undefined || user.resetCode === null ? "" : String(user.resetCode).trim();
+
+        // Check expiry
+        if (user.resetCodeExpires && Date.now() > new Date(user.resetCodeExpires).getTime()) {
+            return res.status(400).json({ error: "Reset code expired. Please request a new one." });
+        }
+
+        if (!stored || stored !== provided) {
+            return res.status(400).json({ error: "Invalid reset code!" });
+        }
+
+        res.status(200).json({ message: "Reset code verified successfully!" });
+    } catch (error) {
+        console.log("Error verifying reset code!", error);
+        res.status(500).json({ error: "Server error. Please try again later!" });
+    }
+}
+
+// request reset code
+const requestResetCode = async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email) {
+            return res.status(400).json({ error: "Email is required!" });
+        }
+
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(404).json({ error: "User not found!" });
+        }
+
+    // Generate reset code, set expiry, save and send email
+    user.resetCode = generateResetCode();
+    // expires in 10 minutes
+    user.resetCodeExpires = new Date(Date.now() + 10 * 60 * 1000);
+    await user.save();
+
+    // Send email with reset code (implementation not shown)
+    sendResetCodeEmail(user.email, user.resetCode);
+
+    res.status(200).json({ message: "Reset code sent to email!" });
+    } catch (error) {
+        console.log("Error requesting reset code!", error);
+        res.status(500).json({ error: "Server error. Please try again later!" });
+    }
+}
+
+const generateResetCode = () => {
+   //4 digit code
+    return Math.floor(1000 + Math.random() * 9000);
+}
+
+
+const sendResetCodeEmail = (email, resetCode) => {
+    // Placeholder function for sending email
+    console.log(`Sending reset code ${resetCode} to email: ${email}`);
+}
 
 
 
-
-
-
-module.exports={register,login, getAllUsers, deleteUser, getUserById, resetPassword};
+module.exports={register,login, getAllUsers, deleteUser, getUserById, changePassword, requestResetCode, verifyResetCode, generateResetCode, sendResetCodeEmail};

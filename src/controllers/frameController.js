@@ -26,7 +26,11 @@ const addFrame = async(req, res) => {
         await frame.save();
         res.status(201).json({message:"Frame added successfully.", frame});
     } catch (error) {
-        console.log("Error adding Frame",error)
+        console.log("Error adding Frame:", {
+            message: error.message,
+            name: error.name,
+            stack: error.stack
+        });
         res.status(500).json({error:"Server error. Please try again later!"})
     }
 }
@@ -90,4 +94,19 @@ const UpdateFrame = async (req,res) => {
     
 }
 
-module.exports={addFrame, getAllFrames, deleteFrame, UpdateFrame}
+// Get Frame by ID
+const getFrameById = async (req, res) => {
+    try {
+        const { frameId } = req.params;
+        const frame = await Frame.findById(frameId);
+        if (!frame) {
+            return res.status(404).json({ error: "Frame not found!" });
+        }
+        res.status(200).json({ frame });
+    } catch (error) {
+        console.log("Error fetching frame by ID", error);
+        res.status(500).json({ error: "Server error! Please try again later!" });
+    }
+};
+        
+module.exports={addFrame, getAllFrames, deleteFrame, UpdateFrame, getFrameById}

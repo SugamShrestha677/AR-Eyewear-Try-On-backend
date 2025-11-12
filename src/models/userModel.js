@@ -20,6 +20,7 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
     default: "CUSTOMER",
+    enum: ["ADMIN", "CUSTOMER"]
   },
   mobile: {
     type: String,
@@ -38,6 +39,20 @@ const userSchema = new mongoose.Schema({
     default:
       "https://res.cloudinary.com/yourapp/image/upload/v1/default-profile.png",
   },
+  // Password reset fields
+  resetCode: {
+    type: String,
+  },
+
+
+  
+  // resetCodeExpires: {
+  //   type: Date,
+  // },
+
+
+
+
   // paymentInformation:[{
   //     type:mongoose.Schema.Types.ObjectId,
   //     ref:"payment_information"

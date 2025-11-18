@@ -1,30 +1,34 @@
+
+// auth.js - alternative (more common)
 const jwt = require('jsonwebtoken');
 const config = require('../config/config');
+const User = require('../models/userModel');
 
-// JWT Authentication Middleware
-const auth = (req, res, next) => {
+const auth = async (req, res, next) => {
     try {
         const authHeader = req.headers['authorization'] || req.headers['Authorization'];
 
-        // Check if Authorization header exists
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
             return res.status(401).json({ error: 'Authorization header missing or invalid' });
         }
 
-        // Extract token from "Bearer <token>"
         const token = authHeader.split(' ')[1];
 
         if (!token) {
             return res.status(401).json({ error: 'Token not provided' });
         }
 
-        // Verify token
         const payload = jwt.verify(token, config.JWT_SECRET);
         
-        // Attach userId to request object
-        req.userId = payload.userId;
+        // Get user from database (optional but recommended)
+        const user = await User.findById(payload.userId).select('-password');
+        if (!user) {
+            return res.status(401).json({ error: 'User not found' });
+        }
         
-        // Continue to next middleware/route handler
+        // Attach full user object to request
+        req.user = user;
+        
         next();
     } catch (error) {
         if (error.name === 'TokenExpiredError') {

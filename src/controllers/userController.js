@@ -231,9 +231,6 @@ const generateResetCode = () => {
     return Math.floor(1000 + Math.random() * 9000).toString();
 }
 
-
-
-
 const sendResetCodeEmail = (email, resetCode) => {
     // Placeholder function for sending email
     console.log(`Sending reset code ${resetCode} to email: ${email}`);

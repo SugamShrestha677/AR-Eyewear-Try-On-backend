@@ -146,26 +146,14 @@ const verifyResetCode = async (req, res) => {
             return res.status(404).json({ error: "User not found!" });
         }
 
-<<<<<<< HEAD
         // Normalize types: accept numeric or string input from client
         const provided = String(resetCode).trim();
         const stored = String(user.resetCode || "").trim();
-=======
-        // Normalize types: stored code is a string. Accept numeric or string input from client.
-        const provided = resetCode === undefined || resetCode === null ? "" : String(resetCode).trim();
-        const stored = user.resetCode === undefined || user.resetCode === null ? "" : String(user.resetCode).trim();
-
-        // Check expiry
-        if (user.resetCodeExpires && Date.now() > new Date(user.resetCodeExpires).getTime()) {
-            return res.status(400).json({ error: "Reset code expired. Please request a new one." });
-        }
->>>>>>> 993ca65e0ad6261d529e10e25174a1ca5c9ad150
 
         if (!stored || stored !== provided) {
             return res.status(400).json({ error: "Invalid reset code!" });
         }
 
-<<<<<<< HEAD
         //Create temporary token (valid for 10 minutes)
         const tempToken = jwt.sign(
             {userId:user._id},
@@ -174,9 +162,6 @@ const verifyResetCode = async (req, res) => {
         )
 
         res.status(200).json({ message: "Reset code verified successfully!", tempToken });
-=======
-        res.status(200).json({ message: "Reset code verified successfully!" });
->>>>>>> 993ca65e0ad6261d529e10e25174a1ca5c9ad150
     } catch (error) {
         console.log("Error verifying reset code!", error);
         res.status(500).json({ error: "Server error. Please try again later!" });
@@ -226,7 +211,6 @@ const requestResetCode = async (req, res) => {
             return res.status(404).json({ error: "User not found!" });
         }
 
-<<<<<<< HEAD
         // Generate reset code and send email (implementation not shown)
         user.resetCode = generateResetCode();
         user.resetCodeExpires=Date.now()+10*60*1000;
@@ -236,18 +220,6 @@ const requestResetCode = async (req, res) => {
         sendResetCodeEmail(user.email, user.resetCode);
 
         res.status(200).json({ message: "Reset code sent to email!" });
-=======
-    // Generate reset code, set expiry, save and send email
-    user.resetCode = generateResetCode();
-    // expires in 10 minutes
-    user.resetCodeExpires = new Date(Date.now() + 10 * 60 * 1000);
-    await user.save();
-
-    // Send email with reset code (implementation not shown)
-    sendResetCodeEmail(user.email, user.resetCode);
-
-    res.status(200).json({ message: "Reset code sent to email!" });
->>>>>>> 993ca65e0ad6261d529e10e25174a1ca5c9ad150
     } catch (error) {
         console.log("Error requesting reset code!", error);
         res.status(500).json({ error: "Server error. Please try again later!" });

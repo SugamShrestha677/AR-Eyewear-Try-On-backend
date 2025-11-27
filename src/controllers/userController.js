@@ -36,11 +36,11 @@ const register = async(req, res) => {
 // Login
 const login = async (req,res) => {
     try {
-        const {username, password}=req.body;
-        if (!username || !password) {
+        const {identifier, password}=req.body; // here identifier is either email or username
+        if (!identifier || !password) {
             return res.status(400).json({error:"All fields are required!"});
         }
-        const user = await User.findOne({username})
+        const user = await User.findOne({$or:[{username:identifier},{email:identifier}]})
         if (!user) {
             return res.status(400).json({error:"Invalid Credentials!"});
         }
@@ -107,7 +107,7 @@ const getUserById = async (req, res) => {
 }
 
 // password reset 
-const resetPassword = async (req, res) => {
+const changePassword = async (req, res) => {
     try {
         const { email, oldPassword, newPassword } = req.body;
         if (!email || !oldPassword || !newPassword) {
@@ -148,17 +148,53 @@ const verifyResetCode = async (req, res) => {
         }
 
         // Normalize types: accept numeric or string input from client
-        const provided = resetCode === undefined || resetCode === null ? "" : String(resetCode).trim();
-        const stored = user.resetCode === undefined || user.resetCode === null ? "" : String(user.resetCode).trim();
+        const provided = String(resetCode).trim();
+        const stored = String(user.resetCode || "").trim();
 
         if (!stored || stored !== provided) {
             return res.status(400).json({ error: "Invalid reset code!" });
         }
 
-        res.status(200).json({ message: "Reset code verified successfully!" });
+        //Create temporary token (valid for 10 minutes)
+        const tempToken = jwt.sign(
+            {userId:user._id},
+            config.JWT_SECRET,
+            {expiresIn:"10m"}
+        )
+
+        res.status(200).json({ message: "Reset code verified successfully!", tempToken });
     } catch (error) {
         console.log("Error verifying reset code!", error);
         res.status(500).json({ error: "Server error. Please try again later!" });
+    }
+}
+
+const resetPassword = async (req,res) => {
+    try {
+        const {tempToken, newPassword} = req.body;
+        if (!tempToken || !newPassword) {
+            return res.status(400).json({error:"All fields are required!"})
+        }
+
+        const decoded = jwt.verify(tempToken,config.JWT_SECRET);
+        const user = await User.findById(decoded.userId);
+
+        if (!user) {
+            return res.status(404).json({error:"User not found!"})
+        }
+
+        user.password = await bcrypt.hash(newPassword,10);
+
+        // clear password
+        user.resetCode = null;
+        user.resetCodeExpires = null;
+        await user.save();
+
+        res.status(200).json({message:"Password reset successfully!"})
+        
+    } catch (error) {
+        res.status(500).json({error:"Server error! Please Try again later!"});
+        console.log(error,"Error in reseting password!");
     }
 }
 
@@ -177,6 +213,7 @@ const requestResetCode = async (req, res) => {
 
         // Generate reset code and send email (implementation not shown)
         user.resetCode = generateResetCode();
+        user.resetCodeExpires=Date.now()+10*60*1000;
         await user.save();
 
         // Send email with reset code (implementation not shown)
@@ -201,4 +238,4 @@ const sendResetCodeEmail = (email, resetCode) => {
 
 
 
-module.exports={register,login, getAllUsers, deleteUser, getUserById, resetPassword, requestResetCode, verifyResetCode, generateResetCode, sendResetCodeEmail};
+module.exports={register,login, getAllUsers, deleteUser, getUserById, changePassword, requestResetCode,resetPassword, verifyResetCode, generateResetCode, sendResetCodeEmail};

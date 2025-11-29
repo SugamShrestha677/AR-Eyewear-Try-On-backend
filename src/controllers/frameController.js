@@ -81,11 +81,7 @@ const UpdateFrame = async (req,res) => {
             quantity,
             image,
             colors,
-<<<<<<< HEAD
             overlayImage
-=======
-            overlayImage,
->>>>>>> 993ca65e0ad6261d529e10e25174a1ca5c9ad150
         });
 
         await Updatedframe.save();

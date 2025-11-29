@@ -2,12 +2,15 @@ const express = require('express');
 const config = require('./src/config/config');
 const db = require('./src/config/db');
 const app = express()
+const cors = require('cors');
 
 const userRoutes = require('./src/routes/userRoutes');
 const frameRoutes = require('./src/routes/frameRoutes');
 const favoriteRoutes = require('./src/routes/favoriteRoutes');
 const mainCategoryRoutes = require('./src/routes/mainCategoryRoutes');
 const subCategoryRoutes = require('./src/routes/subCategoryRoutes');
+
+app.use(cors());
 
 app.use(express.json());
 

@@ -1,11 +1,24 @@
 const mongoose = require('mongoose');
+
 const frameSchema = new mongoose.Schema({
- name: {
+  name: {
     type: String,
-    required: true
+    required: true,
+    trim: true
   },
   brand: {
     type: String,
+    required: true,
+    trim: true
+  },
+  mainCategory: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'MainCategory',
+    required: true
+  },
+  subCategory: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'SubCategory',
     required: true
   },
   type: {
@@ -15,46 +28,70 @@ const frameSchema = new mongoose.Schema({
   },
   shape: {
     type: String,
-    enum: ["round", "rectangle", "square", "aviator", "wayfarer"],
+    enum: ["round", "rectangle", "square", "aviator", "wayfarer", "cate_eye", "geometric", "oval", "browline"],
     required: true
   },
   price: {
     type: Number,
-    required: true
+    required: true,
+    min: 0
   },
   quantity: {
     type: Number,
-    required: true
+    required: true,
+    min: 0
   },
-  image: {
-    type: String,
-    default: "",
-    required:true
-  },
+  images: [{
+    data: Buffer, // Store image binary data
+    contentType: String, // e.g., 'image/jpeg', 'image/png'
+    filename: String, // Original file name
+    size: Number, // File size in bytes
+    uploadedAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
   overlayImage: {
-    type: String,
-    default: "",
-    required:true
+    data: Buffer,
+    contentType: String,
+    filename: String,
+    size: Number,
+    uploadedAt: {
+      type: Date,
+      default: Date.now
+    }
   },
   description: {
     type: String,
     default: ""
   },
   colors: [{
-    type: String
+    type: String,
+    required: true
   }],
   size: {
-    type: String
+    type: String,
+    enum: ["extra-small", "small", "medium", "large", "extra-large"],
+    required: true
   },
-  dimensions: {
-    width: Number,
-    height: Number,
-    bridge: Number
+  isActive: {
+    type: Boolean,
+    default: true
   },
   createdAt: {
     type: Date,
     default: Date.now
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now
   }
+});
+
+// Update timestamp before saving
+frameSchema.pre('save', function(next) {
+  this.updatedAt = Date.now();
+  next();
 });
 
 const Frame = mongoose.model("Frame", frameSchema);

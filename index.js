@@ -2,15 +2,23 @@ const express = require('express');
 const config = require('./src/config/config');
 const db = require('./src/config/db');
 const app = express()
+const cors = require('cors');
 
 const userRoutes = require('./src/routes/userRoutes');
 const frameRoutes = require('./src/routes/frameRoutes');
 const favoriteRoutes = require('./src/routes/favoriteRoutes');
+const mainCategoryRoutes = require('./src/routes/mainCategoryRoutes');
+const subCategoryRoutes = require('./src/routes/subCategoryRoutes');
+
+app.use(cors());
+
 app.use(express.json());
 
 app.use("/api/users",userRoutes);
 app.use("/api/frames",frameRoutes);
 app.use("/api/favorites", favoriteRoutes);
+app.use('/api/main-categories', mainCategoryRoutes);
+app.use('/api/sub-categories', subCategoryRoutes);
 
 app.get("/",(req,res)=>{
     res.send("This is the trial project of Netrafit.");

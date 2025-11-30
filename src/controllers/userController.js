@@ -4,6 +4,14 @@ const User = require('../models/userModel');
 const bcrypt = require('bcryptjs');
 const nodemailer = require('nodemailer');
 
+// Configuration for reset code timing - Easy to modify
+const RESET_CODE_CONFIG = {
+    EXPIRATION_MINUTES: 10,      // Reset code validity
+    RATE_LIMIT_MINUTES: 2,       // Minimum time between reset requests
+    MAX_ATTEMPTS: 5,             // Maximum verification attempts
+    SUSPENSION_MINUTES: 10       // Account suspension time after max attempts
+};
+
 // Create nodemailer transporter
 const createTransporter = () => {
     return nodemailer.createTransport({
@@ -248,7 +256,7 @@ const changePassword = async (req, res) => {
     }
 }
 
-// Step 1: Request reset code
+// Step 1: Request reset code with rate limiting and security features
 const requestResetCode = async (req, res) => {
     try {
         const { email } = req.body;
@@ -258,30 +266,56 @@ const requestResetCode = async (req, res) => {
 
         const user = await User.findOne({ email });
         if (!user) {
-            // Don't reveal that user doesn't exist for security
-            return res.status(200).json({ 
-                message: "If the email exists, a reset code has been sent!" 
+            // Show user not found for better UX
+            return res.status(404).json({ error: "User not found with this email address!" });
+        }
+
+        const now = Date.now();
+        const rateLimitWindow = RESET_CODE_CONFIG.RATE_LIMIT_MINUTES * 60 * 1000;
+        const expirationWindow = RESET_CODE_CONFIG.EXPIRATION_MINUTES * 60 * 1000;
+        const suspensionWindow = RESET_CODE_CONFIG.SUSPENSION_MINUTES * 60 * 1000;
+
+        // Check if account is suspended due to too many attempts
+        if (user.accountSuspendedUntil && user.accountSuspendedUntil > now) {
+            const remainingTime = Math.ceil((user.accountSuspendedUntil - now) / 1000 / 60);
+            return res.status(429).json({ 
+                error: `Account temporarily suspended due to too many failed attempts. Please try again after ${remainingTime} minute(s).`,
+                code: "ACCOUNT_SUSPENDED",
+                retryAfter: Math.ceil((user.accountSuspendedUntil - now) / 1000)
             });
         }
 
-        // Generate 6-digit reset code
-        const resetCode = generateResetCode();
-        
-        // Set reset code and expiration (10 minutes)
-        user.resetCode = resetCode;
-        user.resetCodeExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
-        await user.save();
+        // Check if there's an existing valid reset code and if rate limit applies
+        if (user.resetCode && user.resetCodeExpires) {
+            const timeSinceLastRequest = now - user.lastResetRequest;
+            const timeUntilExpiry = user.resetCodeExpires - now;
 
-        // Send email with reset code
-        const emailSent = await sendResetCodeEmail(user.email, resetCode, user.fullname || user.username);
+            // If within rate limit window and code is still valid, don't generate new code
+            if (timeSinceLastRequest < rateLimitWindow && timeUntilExpiry > 0) {
+                const remainingTime = Math.ceil((rateLimitWindow - timeSinceLastRequest) / 1000 / 60);
+                return res.status(429).json({ 
+                    error: `Please use the reset code already sent to your email. You can request a new code in ${remainingTime} minute(s).`,
+                    retryAfter: Math.ceil((rateLimitWindow - timeSinceLastRequest) / 1000)
+                });
+            }
 
-        if (!emailSent) {
-            return res.status(500).json({ error: "Failed to send reset code email. Please try again." });
+            // If code exists but is expired, and we're past rate limit window, generate new one
+            if (timeUntilExpiry <= 0 && timeSinceLastRequest >= rateLimitWindow) {
+                // Code expired and rate limit passed - generate new code
+                await generateAndSendResetCode(user, now, expirationWindow);
+                return res.status(200).json({ 
+                    message: "Reset code has been sent to your email!",
+                    expiresIn: `${RESET_CODE_CONFIG.EXPIRATION_MINUTES} minutes`
+                });
+            }
         }
 
+        // No valid existing code or rate limit passed - generate new code
+        await generateAndSendResetCode(user, now, expirationWindow);
+        
         res.status(200).json({ 
-            message: "If the email exists, a reset code has been sent!",
-            expiresIn: "10 minutes"
+            message: "Reset code has been sent to your email!",
+            expiresIn: `${RESET_CODE_CONFIG.EXPIRATION_MINUTES} minutes`
         });
     } catch (error) {
         console.log("Error requesting reset code!", error);
@@ -289,7 +323,23 @@ const requestResetCode = async (req, res) => {
     }
 }
 
-// Step 2: Verify reset code
+// Helper function to generate and send reset code
+const generateAndSendResetCode = async (user, timestamp, expirationWindow) => {
+    const resetCode = generateResetCode();
+    
+    // Set reset code, expiration, and last request time
+    user.resetCode = resetCode;
+    user.resetCodeExpires = timestamp + expirationWindow;
+    user.lastResetRequest = timestamp;
+    user.resetAttempts = 0; // Reset attempt counter
+    user.accountSuspendedUntil = null; // Clear any previous suspension
+    await user.save();
+
+    // Send email with reset code
+    await sendResetCodeEmail(user.email, resetCode, user.fullname || user.username);
+}
+
+// Step 2: Verify reset code with attempt limiting and suspension
 const verifyResetCode = async (req, res) => {
     try {
         const { email, resetCode } = req.body;
@@ -297,24 +347,89 @@ const verifyResetCode = async (req, res) => {
             return res.status(400).json({ error: "Email and reset code are required!" });
         }
 
-        const user = await User.findOne({ 
-            email, 
-            resetCodeExpires: { $gt: Date.now() }
-        });
-        
+        const user = await User.findOne({ email });
         if (!user) {
-            return res.status(400).json({ 
-                error: "Invalid reset code or code has expired. Please request a new code." 
+            return res.status(404).json({ error: "User not found!" });
+        }
+
+        const now = Date.now();
+
+        // Check if account is suspended
+        if (user.accountSuspendedUntil && user.accountSuspendedUntil > now) {
+            const remainingTime = Math.ceil((user.accountSuspendedUntil - now) / 1000 / 60);
+            return res.status(429).json({ 
+                error: `Account temporarily suspended due to too many failed attempts. Please try again after ${remainingTime} minute(s).`,
+                code: "ACCOUNT_SUSPENDED",
+                retryAfter: Math.ceil((user.accountSuspendedUntil - now) / 1000)
             });
         }
 
-        // Normalize types
+        // Check if user has exceeded maximum attempts
+        if (user.resetAttempts >= RESET_CODE_CONFIG.MAX_ATTEMPTS) {
+            // Suspend the account
+            user.accountSuspendedUntil = now + (RESET_CODE_CONFIG.SUSPENSION_MINUTES * 60 * 1000);
+            await user.save();
+            
+            // Send suspension email
+            await sendAccountSuspensionEmail(user.email, user.fullname || user.username, RESET_CODE_CONFIG.SUSPENSION_MINUTES);
+            
+            return res.status(429).json({ 
+                error: `Too many failed attempts. Your account has been temporarily suspended for ${RESET_CODE_CONFIG.SUSPENSION_MINUTES} minutes.`,
+                code: "ACCOUNT_SUSPENDED",
+                retryAfter: RESET_CODE_CONFIG.SUSPENSION_MINUTES * 60
+            });
+        }
+
+        // Check if reset code exists and is not expired
+        if (!user.resetCode || !user.resetCodeExpires || user.resetCodeExpires < now) {
+            // Increment failed attempts for expired code
+            user.resetAttempts = (user.resetAttempts || 0) + 1;
+            await user.save();
+
+            const remainingAttempts = RESET_CODE_CONFIG.MAX_ATTEMPTS - user.resetAttempts;
+            
+            return res.status(400).json({ 
+                error: `Reset code has expired. Please request a new code. ${remainingAttempts} attempt(s) remaining.`,
+                code: "CODE_EXPIRED",
+                remainingAttempts
+            });
+        }
+
+        // Normalize types and compare
         const provided = String(resetCode).trim();
         const stored = String(user.resetCode || "").trim();
 
         if (stored !== provided) {
-            return res.status(400).json({ error: "Invalid reset code!" });
+            // Increment failed attempts
+            user.resetAttempts = (user.resetAttempts || 0) + 1;
+            await user.save();
+
+            const remainingAttempts = RESET_CODE_CONFIG.MAX_ATTEMPTS - user.resetAttempts;
+            
+            // Check if this was the final attempt that triggers suspension
+            if (user.resetAttempts >= RESET_CODE_CONFIG.MAX_ATTEMPTS) {
+                user.accountSuspendedUntil = now + (RESET_CODE_CONFIG.SUSPENSION_MINUTES * 60 * 1000);
+                await user.save();
+                
+                await sendAccountSuspensionEmail(user.email, user.fullname || user.username, RESET_CODE_CONFIG.SUSPENSION_MINUTES);
+                
+                return res.status(429).json({ 
+                    error: `Too many failed attempts. Your account has been temporarily suspended for ${RESET_CODE_CONFIG.SUSPENSION_MINUTES} minutes.`,
+                    code: "ACCOUNT_SUSPENDED",
+                    retryAfter: RESET_CODE_CONFIG.SUSPENSION_MINUTES * 60
+                });
+            }
+            
+            return res.status(400).json({ 
+                error: `Invalid reset code! ${remainingAttempts} attempt(s) remaining.`,
+                remainingAttempts
+            });
         }
+
+        // Reset attempts on successful verification
+        user.resetAttempts = 0;
+        user.accountSuspendedUntil = null;
+        await user.save();
 
         // Create temporary token for password reset
         const tempToken = jwt.sign(
@@ -360,9 +475,12 @@ const resetPassword = async (req, res) => {
         // For password reset, always log out all devices for security
         user.passwordChangedAt = Date.now();
         
-        // Clear reset code fields
+        // Clear all reset-related fields
         user.resetCode = null;
         user.resetCodeExpires = null;
+        user.lastResetRequest = null;
+        user.resetAttempts = 0;
+        user.accountSuspendedUntil = null;
         
         await user.save();
 
@@ -412,8 +530,10 @@ const sendResetCodeEmail = async (email, resetCode, username) => {
                     </div>
                     
                     <p style="color: #666; font-size: 14px;">
-                        <strong>This code will expire in 10 minutes.</strong>
+                        <strong>This code will expire in ${RESET_CODE_CONFIG.EXPIRATION_MINUTES} minutes.</strong>
                     </p>
+                    
+                    <p><strong>Security Notice:</strong> You have ${RESET_CODE_CONFIG.MAX_ATTEMPTS} attempts to enter the correct code. After ${RESET_CODE_CONFIG.MAX_ATTEMPTS} failed attempts, your account will be temporarily suspended for ${RESET_CODE_CONFIG.SUSPENSION_MINUTES} minutes.</p>
                     
                     <p>If you didn't request this reset, please ignore this email. Your account remains secure.</p>
                     
@@ -423,7 +543,7 @@ const sendResetCodeEmail = async (email, resetCode, username) => {
                     </p>
                 </div>
             `,
-            text: `Password Reset Request\n\nHello ${username},\n\nYou have requested to reset your password. Use the following verification code:\n\n${resetCode}\n\nThis code will expire in 10 minutes.\n\nIf you didn't request this reset, please ignore this email.`
+            text: `Password Reset Request\n\nHello ${username},\n\nYou have requested to reset your password. Use the following verification code:\n\n${resetCode}\n\nThis code will expire in ${RESET_CODE_CONFIG.EXPIRATION_MINUTES} minutes.\n\nSecurity Notice: You have ${RESET_CODE_CONFIG.MAX_ATTEMPTS} attempts to enter the correct code. After ${RESET_CODE_CONFIG.MAX_ATTEMPTS} failed attempts, your account will be temporarily suspended for ${RESET_CODE_CONFIG.SUSPENSION_MINUTES} minutes.\n\nIf you didn't request this reset, please ignore this email.`
         };
 
         await transporter.sendMail(mailOptions);
@@ -432,6 +552,60 @@ const sendResetCodeEmail = async (email, resetCode, username) => {
         
     } catch (error) {
         console.log("Error sending reset email:", error);
+        return false;
+    }
+}
+
+// Send account suspension email
+const sendAccountSuspensionEmail = async (email, username, suspensionMinutes) => {
+    try {
+        const transporter = createTransporter();
+        
+        const mailOptions = {
+            from: `"NetraFit Security" <${config.EMAIL_USER}>`,
+            to: email,
+            subject: 'Account Temporarily Suspended - NetraFit',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #ff6b6b;">Account Temporarily Suspended</h2>
+                    <p>Hello ${username},</p>
+                    
+                    <div style="background-color: #fff5f5; padding: 15px; border-left: 4px solid #ff6b6b; margin: 20px 0;">
+                        <p style="margin: 0; font-weight: bold; color: #d63031;">Security Alert:</p>
+                        <p style="margin: 10px 0 0 0;">Your account has been temporarily suspended for ${suspensionMinutes} minutes due to too many failed password reset attempts.</p>
+                    </div>
+                    
+                    <p><strong>What happened?</strong></p>
+                    <ul>
+                        <li>Multiple incorrect reset code attempts were detected</li>
+                        <li>For security reasons, your account has been temporarily suspended</li>
+                        <li>This is an automated security measure to protect your account</li>
+                    </ul>
+                    
+                    <p><strong>What to do next?</strong></p>
+                    <ul>
+                        <li>Wait for ${suspensionMinutes} minutes before attempting to reset your password again</li>
+                        <li>Ensure you're using the correct reset code from your email</li>
+                        <li>If you continue to have issues, contact our support team</li>
+                    </ul>
+                    
+                    <p>If you did not attempt to reset your password, please contact our support team immediately as this could indicate unauthorized access attempts.</p>
+                    
+                    <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+                    <p style="color: #999; font-size: 12px;">
+                        This is an automated security message. Please do not reply to this email.
+                    </p>
+                </div>
+            `,
+            text: `Account Temporarily Suspended\n\nHello ${username},\n\nSECURITY ALERT: Your account has been temporarily suspended for ${suspensionMinutes} minutes due to too many failed password reset attempts.\n\nWhat happened?\n- Multiple incorrect reset code attempts were detected\n- For security reasons, your account has been temporarily suspended\n- This is an automated security measure to protect your account\n\nWhat to do next?\n- Wait for ${suspensionMinutes} minutes before attempting to reset your password again\n- Ensure you're using the correct reset code from your email\n- If you continue to have issues, contact our support team\n\nIf you did not attempt to reset your password, please contact our support team immediately.`
+        };
+
+        await transporter.sendMail(mailOptions);
+        console.log(`Account suspension email sent to: ${email}`);
+        return true;
+        
+    } catch (error) {
+        console.log("Error sending suspension email:", error);
         return false;
     }
 }
@@ -526,6 +700,7 @@ const sendPasswordResetConfirmationEmail = async (email, username) => {
     }
 }
 
+// Export configuration for easy external access
 module.exports = {
     register,
     login, 
@@ -540,6 +715,8 @@ module.exports = {
     sendResetCodeEmail,
     sendPasswordResetConfirmationEmail,
     sendPasswordChangeConfirmationEmail,
+    sendAccountSuspensionEmail,
     getMyProfile,
-    updateProfile
+    updateProfile,
+    RESET_CODE_CONFIG // Export config for easy modification
 };

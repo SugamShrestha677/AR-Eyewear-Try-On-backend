@@ -53,6 +53,16 @@ const userSchema = new mongoose.Schema({
   passwordChangedAt: {
     type: Date,
   },
+  lastResetRequest: {
+    type: Date,
+  },
+  resetAttempts: {
+    type: Number,
+    default: 0
+  },
+  accountSuspendedUntil: {
+    type: Date,
+  },
   // paymentInformation:[{
   //     type:mongoose.Schema.Types.ObjectId,
   //     ref:"payment_information"

@@ -7,6 +7,8 @@ const config ={
     JWT_EXPIRATION:process.env.JWT_EXPIRATION,
     CORS_ORIGIN:process.env.CORS_ORIGIN,
     API_BASE_URL:process.env.API_BASE_URL,
-    FRONTEND_BASE_URL:process.env.FRONTEND_BASE_URL
+    FRONTEND_BASE_URL:process.env.FRONTEND_BASE_URL,
+    EMAIL_USER: process.env.EMAIL_USER ,
+    EMAIL_PASS: process.env.EMAIL_PASS 
 }
 module.exports=config;

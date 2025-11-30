@@ -1,8 +1,10 @@
 const mongoose = require("mongoose");
+
 const userSchema = new mongoose.Schema({
   username: {
     type: String,
     required: true,
+    unique: true
   },
   fullname: {
     type: String,
@@ -11,6 +13,7 @@ const userSchema = new mongoose.Schema({
   email: {
     type: String,
     required: true,
+    unique: true
   },
   password: {
     type: String,
@@ -32,16 +35,22 @@ const userSchema = new mongoose.Schema({
   },
   status: {
     type: String,
+    default: "ACTIVE"
   },
   profilePhoto: {
     type: String,
-    default:
-      "https://res.cloudinary.com/yourapp/image/upload/v1/default-profile.png",
+    default: function() {
+      const randomId = Math.floor(Math.random() * 100) + 1; // Random number between 1-100
+      return `https://avatar.iran.liara.run/public/${randomId}`;
+    },
   },
   resetCode: {
     type: String,
   },
   resetCodeExpires: {
+    type: Date,
+  },
+  passwordChangedAt: {
     type: Date,
   },
   // paymentInformation:[{
@@ -56,11 +65,20 @@ const userSchema = new mongoose.Schema({
   //     type:mongoose.Schema.Types.ObjectId,
   //     ref:"reviews"
   // }],
-
   createdAt: {
     type: Date,
-    default: Date.now(),
+    default: Date.now,
   },
+  updatedAt: {
+    type: Date,
+    default: Date.now,
+  },
+});
+
+// Update the updatedAt field before saving
+userSchema.pre('save', function(next) {
+  this.updatedAt = Date.now();
+  next();
 });
 
 const User = mongoose.model("users", userSchema);

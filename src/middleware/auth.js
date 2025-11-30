@@ -1,8 +1,9 @@
 const jwt = require('jsonwebtoken');
 const config = require('../config/config');
+const User = require('../models/userModel');
 
 // JWT Authentication Middleware
-const auth = (req, res, next) => {
+const auth = async (req, res, next) => {
     try {
         const authHeader = req.headers['authorization'] || req.headers['Authorization'];
 
@@ -21,8 +22,20 @@ const auth = (req, res, next) => {
         // Verify token
         const payload = jwt.verify(token, config.JWT_SECRET);
         
-        // Attach userId to request object
+        // Get user from database
+        const user = await User.findById(payload.userId);
+        if (!user) {
+            return res.status(401).json({ error: 'User not found' });
+        }
+
+        // Check if password was changed after token was issued
+        if (user.passwordChangedAt && payload.iat * 1000 < user.passwordChangedAt.getTime()) {
+            return res.status(401).json({ error: 'Password was changed recently. Please login again.' });
+        }
+
+        // Attach userId and user to request object
         req.userId = payload.userId;
+        req.user = user;
         
         // Continue to next middleware/route handler
         next();

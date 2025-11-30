@@ -60,6 +60,76 @@ const login = async (req,res) => {
     }
 }
 
+// Get logged-in user profile
+const getMyProfile = async (req, res) => {
+    try {
+        // The user ID should be attached to the request object by your authentication middleware
+        const userId = req.userId || req.user?.id || req.user?._id;
+        
+        if (!userId) {
+            return res.status(401).json({ error: "Unauthorized access. Please login." });
+        }
+
+        const user = await User.findById(userId).select("-password");
+        if (!user) {
+            return res.status(404).json({ error: "User not found!" });
+        }
+
+        res.status(200).json({ 
+            message: "Profile fetched successfully", 
+            user: {
+                id: user._id,
+                username: user.username,
+                fullname: user.fullname,
+                role: user.role,
+                email: user.email,
+                mobile: user.mobile,
+                address: user.address,
+                createdAt: user.createdAt,
+                updatedAt: user.updatedAt
+            }
+        });
+    } catch (error) {
+        console.log("Error fetching user profile!", error);
+        res.status(500).json({ error: "Server error. Please try again later!" });
+    }
+}
+
+// Update user profile
+const updateProfile = async (req, res) => {
+    try {
+        const userId = req.userId || req.user?.id || req.user?._id;
+        const { fullname, mobile, address } = req.body;
+
+        if (!userId) {
+            return res.status(401).json({ error: "Unauthorized access. Please login." });
+        }
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ error: "User not found!" });
+        }
+
+        // Update only allowed fields
+        if (fullname) user.fullname = fullname;
+        if (mobile) user.mobile = mobile;
+        if (address) user.address = address;
+
+        await user.save();
+
+        // Return user without password
+        const userResponse = await User.findById(userId).select("-password");
+        
+        res.status(200).json({ 
+            message: "Profile updated successfully", 
+            user: userResponse 
+        });
+    } catch (error) {
+        console.log("Error updating user profile!", error);
+        res.status(500).json({ error: "Server error. Please try again later!" });
+    }
+}
+
 // Get all registered user
 const getAllUsers = async(req, res)=>{
     try {
@@ -237,5 +307,5 @@ const sendResetCodeEmail = (email, resetCode) => {
 }
 
 
-module.exports={register,login, getAllUsers, deleteUser, getUserById, changePassword, requestResetCode,resetPassword, verifyResetCode, generateResetCode, sendResetCodeEmail};
+module.exports={register,login, getAllUsers, deleteUser, getUserById, changePassword, requestResetCode,resetPassword, verifyResetCode, generateResetCode, sendResetCodeEmail,getMyProfile,updateProfile};
 

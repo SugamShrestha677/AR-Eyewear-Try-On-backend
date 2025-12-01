@@ -7,6 +7,7 @@ const cors = require('cors');
 const userRoutes = require('./src/routes/userRoutes');
 const frameRoutes = require('./src/routes/frameRoutes');
 const favoriteRoutes = require('./src/routes/favoriteRoutes');
+const orderRoutes = require('./src/routes/orderRoutes');
 const mainCategoryRoutes = require('./src/routes/mainCategoryRoutes');
 const subCategoryRoutes = require('./src/routes/subCategoryRoutes');
 
@@ -16,6 +17,7 @@ app.use(express.json());
 
 app.use("/api/users",userRoutes);
 app.use("/api/frames",frameRoutes);
+app.use("/api/order",orderRoutes);
 app.use("/api/favorites", favoriteRoutes);
 app.use('/api/main-categories', mainCategoryRoutes);
 app.use('/api/sub-categories', subCategoryRoutes);

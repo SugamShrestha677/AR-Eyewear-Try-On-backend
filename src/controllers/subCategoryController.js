@@ -1,9 +1,10 @@
 const SubCategory = require('../models/SubCategoryModel');
 const MainCategory = require('../models/MainCategoryModel');
 
+// controllers/subCategoryController.js
 const createSubCategory = async (req, res) => {
   try {
-    const { name, mainCategory } = req.body;
+    const { name, mainCategory, image } = req.body;
 
     if (!name || !mainCategory) {
       return res.status(400).json({
@@ -23,7 +24,8 @@ const createSubCategory = async (req, res) => {
 
     const subCategory = new SubCategory({
       name: name.trim(),
-      mainCategory: mainCategory
+      mainCategory: mainCategory,
+      image: image || null
     });
 
     const savedSubCategory = await subCategory.save();
@@ -44,6 +46,69 @@ const createSubCategory = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error creating sub category',
+      error: error.message
+    });
+  }
+};
+
+const updateSubCategory = async (req, res) => {
+  try {
+    const { name, mainCategory, image } = req.body;
+
+    if (!name) {
+      return res.status(400).json({
+        success: false,
+        message: 'Sub category name is required'
+      });
+    }
+
+    const updateData = { name: name.trim() };
+    
+    if (mainCategory) {
+      // Check if main category exists
+      const mainCategoryExists = await MainCategory.findById(mainCategory);
+      if (!mainCategoryExists) {
+        return res.status(404).json({
+          success: false,
+          message: 'Main category not found'
+        });
+      }
+      updateData.mainCategory = mainCategory;
+    }
+
+    if (image !== undefined) {
+      updateData.image = image;
+    }
+
+    const subCategory = await SubCategory.findByIdAndUpdate(
+      req.params.id,
+      updateData,
+      { new: true, runValidators: true }
+    ).populate('mainCategory', 'name');
+
+    if (!subCategory) {
+      return res.status(404).json({
+        success: false,
+        message: 'Sub category not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Sub category updated successfully',
+      data: subCategory
+    });
+  } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: 'Sub category name already exists'
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: 'Error updating sub category',
       error: error.message
     });
   }
@@ -114,65 +179,6 @@ const getSubCategoriesByMainCategory = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error fetching sub categories',
-      error: error.message
-    });
-  }
-};
-
-const updateSubCategory = async (req, res) => {
-  try {
-    const { name, mainCategory } = req.body;
-
-    if (!name) {
-      return res.status(400).json({
-        success: false,
-        message: 'Sub category name is required'
-      });
-    }
-
-    const updateData = { name: name.trim() };
-    
-    if (mainCategory) {
-      // Check if main category exists
-      const mainCategoryExists = await MainCategory.findById(mainCategory);
-      if (!mainCategoryExists) {
-        return res.status(404).json({
-          success: false,
-          message: 'Main category not found'
-        });
-      }
-      updateData.mainCategory = mainCategory;
-    }
-
-    const subCategory = await SubCategory.findByIdAndUpdate(
-      req.params.id,
-      updateData,
-      { new: true, runValidators: true }
-    ).populate('mainCategory', 'name');
-
-    if (!subCategory) {
-      return res.status(404).json({
-        success: false,
-        message: 'Sub category not found'
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: 'Sub category updated successfully',
-      data: subCategory
-    });
-  } catch (error) {
-    if (error.code === 11000) {
-      return res.status(400).json({
-        success: false,
-        message: 'Sub category name already exists'
-      });
-    }
-    
-    res.status(500).json({
-      success: false,
-      message: 'Error updating sub category',
       error: error.message
     });
   }
